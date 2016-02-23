@@ -35,7 +35,7 @@
         var xScaleTop = d3.scale.linear().range([0, graphWidths]),
             xScaleBottom = d3.scale.linear().range([0, graphWidths]),
             yScaleTop = d3.scale.linear().range([topGraphHeight, 0]),
-            yScaleBottom = d3.scale.linear().range([bottomGraphHeight, 0]);
+            yScaleBottom = d3.scale.log().range([bottomGraphHeight, 0]);
         var xAxisTop = d3.svg.axis().scale(xScaleTop).orient('bottom'),
             xAxisBottom = d3.svg.axis().scale(xScaleBottom).orient('bottom');
         var yAxisTop = d3.svg.axis().scale(yScaleTop).orient('left');
@@ -46,7 +46,7 @@
             .x(function (d) { return xScaleBottom(d.energy); })
             .y(function (d) { return yScaleBottom(d.counts); });
 
-            d3.csv('EELS_C_K-edge.msa', function (error, data) {
+            d3.csv('Spliced Spectrum (FeCr).msa', function (error, data) {
             data.forEach(function (d) {
               d.counts = +d.counts;
               d.energy = +d.energy;
