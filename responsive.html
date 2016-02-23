@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="description" content="A new and responsive implementation of EELS-Viewer" />
+  <meta charset="utf-8">
+  <title>EELS-Viewer (responsive)</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+</head>
+
+<body>
+  <div class="row">
+    <div class="col-xs-10 col-xs-offset-1" id="d3_include"></div>
+  </div>
+</body>
+
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script>
+  var margins = {
+      top: 10,
+      right: 10,
+      bottom: 50,
+      left: 100,
+      between: 50
+    },
+    width,
+    heightTop,
+    heightBottom,
+    ratioTop,
+    ratioBottom,
+    xScaleTop,
+    xScaleBottom,
+    yScaleTop,
+    yScaleBottom,
+    xAxisTop,
+    xAxisBottom,
+    yAxisTop,
+    svg,
+    focus,
+    context,
+    lineTop = d3.svg.line().x(function(d) {
+      return xScaleTop(d.energy);
+    }).y(function(d) {
+      return yScaleTop(d.counts);
+    }),
+    lineBottom = d3.svg.line().x(function(d) {
+      return xScaleBottom(d.energy);
+    }).y(function(d) {
+      return yScaleBottom(d.counts);
+    }),
+    csvData;
+
+  function applyNewSize() {
+    width = parseInt(d3.select("#d3_include").style('width'), 10);
+    width = width - margins.left - margins.right;
+    ratioTop = 2. / 3.;
+    heightTop = d3.min([width * ratioTop - (margins.top + margins.between), 600]);
+    xScaleTop = d3.scale.linear().range([0, width]);
+    yScaleTop = d3.scale.linear().range([heightTop, 0]);
+    ratioBottom = .1;
+    heightBottom = d3.min([width * ratioBottom, 90]);
+    xScaleBottom = d3.scale.linear().range([0, width]);
+    yScaleBottom = d3.scale.log().range([heightBottom, 0]);
+    xAxisTop = d3.svg.axis().scale(xScaleTop).orient('bottom');
+    xAxisBottom = d3.svg.axis().scale(xScaleBottom).orient('bottom');
+    yAxisTop = d3.svg.axis().scale(yScaleTop).orient('left');
+
+    var heightSvg = margins.top + heightTop + margins.between + heightBottom + margins.bottom;
+    svg = d3.select('#d3_include')
+      .append('svg')
+      .attr('width', width)
+      .attr('height', heightSvg)
+      .style('font', '10px sans-serif');
+    svg.append('defs')
+      .append('clipPath')
+      .attr('id', 'clip')
+      .append('rect')
+      .attr('width', width)
+      .attr('height', heightSvg);
+    focus = svg
+      .append('g')
+      .attr('transform', 'translate(' + margins.left + ',' + margins.top + ')');
+    context = svg.append('g')
+      .attr('class', 'context')
+      .attr('transform', 'translate(' + margins.left + ',' + (margins.top + heightTop + margins.between) + ')');
+  }
+
+  function styleLines(svg) {
+    svg.selectAll('path.line')
+      .attr({
+        fill: 'none',
+        'stroke-width': 1.5,
+        stroke: 'steelblue',
+        'clip-path': 'url(#clip)'
+      });
+  }
+
+  function styleAxisNodes(axisNodes, strokeWidth) {
+    axisNodes.selectAll('.domain')
+      .attr({
+        fill: 'none',
+        'stroke-width': strokeWidth,
+        stroke: 'black'
+      });
+    axisNodes.selectAll('.tick line')
+      .attr({
+        fill: 'none',
+        'stroke-width': 1,
+        stroke: 'black'
+      });
+  }
+
+  function createGraph(data) {
+    var brush = d3.svg.brush()
+      .x(xScaleBottom)
+      .on('brush', function brushed() {
+        xScaleTop.domain(brush.empty() ? xScaleBottom.domain() : brush.extent());
+        focus.select('.x.axis').call(xAxisTop);
+        var dataFiltered = data.filter(function(d, i) {
+          if ((d.energy >= xScaleTop.domain()[0]) && (d.energy <= xScaleTop.domain()[1])) {
+            return d.counts;
+          }
+        });
+        yScaleTop.domain([d3.min(dataFiltered.map(function(d) {
+          return d.counts;
+        })), d3.max(dataFiltered.map(function(d) {
+          return d.counts;
+        }))]);
+        focus.select('.y.axis').call(yAxisTop);
+        focus.select("#lineTop").attr("d", lineTop);
+      });
+    xScaleTop.domain(d3.extent(data, function(d) {
+      return d.energy;
+    }));
+    yScaleTop.domain(d3.extent(data, function(d) {
+      return d.counts;
+    }));
+    xScaleBottom.domain(d3.extent(data, function(d) {
+      return d.energy;
+    }));
+    yScaleBottom.domain(d3.extent(data, function(d) {
+      return d.counts;
+    }));
+    var topXAxisNodes = focus.append('g')
+      .attr('class', 'x axis')
+      .attr('transform', 'translate(' + 0 + ',' + (margins.top + heightTop) + ')')
+      .call(xAxisTop);
+    styleAxisNodes(topXAxisNodes, 0);
+    focus.append('path')
+      .datum(data)
+      .attr('id', 'lineTop')
+      .attr('class', 'line')
+      .attr('d', lineTop);
+    var topYAxisNodes = focus.append('g')
+      .attr('class', 'y axis')
+      .call(yAxisTop);
+    styleAxisNodes(topYAxisNodes);
+    context.append('path')
+      .datum(data)
+      .attr('class', 'line')
+      .attr('d', lineBottom);
+    var bottomXAxisNodes = context.append('g')
+      .attr('transform', 'translate(0,' + heightBottom + ')')
+      .call(xAxisBottom);
+    styleAxisNodes(bottomXAxisNodes, 0);
+    context.append('g')
+      .attr('class', 'x brush')
+      .call(brush)
+      .selectAll('rect')
+      .attr('y', -6)
+      .attr('height', heightBottom + 7);
+    context.selectAll('.extent')
+      .attr({
+        stroke: '#000',
+        'fill-opacity': 0.125,
+        'shape-rendering': 'crispEdges'
+      });
+  }
+
+
+  function resize() {
+    svg.remove();
+    applyNewSize();
+    createGraph(csvData);
+    styleLines(svg);
+  }
+
+  d3.csv('Spliced Spectrum (FeCr).msa', function(error, data) {
+    data.forEach(function(d) {
+      d.counts = +d.counts;
+      d.energy = +d.energy;
+    });
+    csvData = data;
+    applyNewSize();
+    createGraph(data)
+    styleLines(svg);
+    d3.select(window).on('resize', resize);
+  });
+</script>
+
+</html>
